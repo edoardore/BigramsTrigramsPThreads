@@ -57,7 +57,6 @@ int main() {
     File_Queue_Init(&fileQueue);
     context ctx;
     setContext(&pathQueue, &fileQueue, &ctx);
-
     struct dirent *en;
     DIR *dr;
     char dir[] = "/Users/edore/CLionProjects/BigramsTrigramsParallel/Gutenberg/txt";
@@ -78,10 +77,10 @@ int main() {
     pthread_t thread[4];
     pthread_create(&thread[1], NULL, (void *) producer, &ctx);
     pthread_create(&thread[2], NULL, (void *) producer, &ctx);
-    pthread_join(thread[1], NULL);
-    pthread_join(thread[2], NULL);
     pthread_create(&thread[3], NULL, (void *) consumer, &ctx);
     pthread_create(&thread[4], NULL, (void *) consumer, &ctx);
+    pthread_join(thread[1], NULL);
+    pthread_join(thread[2], NULL);
     pthread_join(thread[3], NULL);
     pthread_join(thread[4], NULL);
     return 0;
