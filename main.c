@@ -26,10 +26,19 @@ typedef struct __queue_p {
     pthread_mutex_t tailLock;
 } queue_p;
 
+typedef struct __bigram_array {
+    int countBigrams['z' - 'a' + 1]['z' - 'a' + 1];
+    pthread_mutex_t arrayLock;
+} bigramArray;
+
+
 typedef struct __context {
     queue_f *fileQueue;
     queue_p *pathQueue;
+    bigramArray *countBigram;
+
 } context;
+
 
 void Path_Queue_Init(queue_p *q);
 
@@ -43,20 +52,27 @@ void File_Queue_Enqueue(queue_f *q, FILE *file);
 
 int File_Queue_Dequeue(queue_f *q, FILE **file);
 
+void addBigram(bigramArray *countBigrams, int c0, int c1);
+
 void *producer(context *ctx);
 
 void *consumer(context *ctx);
 
-void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx);
+void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram);
 
+void initBigramArray(bigramArray *countBigram);
+
+void printResults(bigramArray countBigram);
 
 int main() {
     queue_p pathQueue;
     Path_Queue_Init(&pathQueue);
     queue_f fileQueue;
     File_Queue_Init(&fileQueue);
+    bigramArray countBigram;
+    initBigramArray(&countBigram);
     context ctx;
-    setContext(&pathQueue, &fileQueue, &ctx);
+    setContext(&pathQueue, &fileQueue, &ctx, &countBigram);
     struct dirent *en;
     DIR *dr;
     char dir[] = "/Users/edore/CLionProjects/BigramsTrigramsParallel/Gutenberg/txt";
@@ -67,8 +83,7 @@ int main() {
             if (i > 1) {
                 char *path = malloc(sizeof(char) * 200);
                 snprintf(path, sizeof(path) * 200,
-                         "/Users/edore/CLionProjects/BigramsTrigramsParallel/Gutenberg/txt/%s",
-                         en->d_name);
+                         "/Users/edore/CLionProjects/BigramsTrigramsParallel/Gutenberg/txt/%s", en->d_name);
                 Path_Queue_Enqueue(&pathQueue, path);
             }
             i++;
@@ -83,6 +98,7 @@ int main() {
     pthread_join(thread[2], NULL);
     pthread_join(thread[3], NULL);
     pthread_join(thread[4], NULL);
+    printResults(countBigram);
     return 0;
 }
 
@@ -100,14 +116,48 @@ void *producer(context *ctx) {
 void *consumer(context *ctx) {
     FILE *file;
     while (File_Queue_Dequeue(ctx->fileQueue, &file) != -1) {
-        char c1;
-        while ((c1 = getc(file)) != EOF) { printf("%c", c1); }
+        int c0 = EOF, c1;
+        while ((c1 = getc(file)) != EOF) {
+            if (c1 >= 'a' && c1 <= 'z' && c0 >= 'a' && c0 <= 'z') {
+                addBigram(ctx->countBigram, c0, c1);
+            }
+            c0 = c1;
+        }
     }
 }
 
-void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx) {
+void initBigramArray(bigramArray *countBigram) {
+    pthread_mutex_init(&countBigram->arrayLock, NULL);
+    int size = 'z' - 'a' + 1;
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            countBigram->countBigrams[i][j] = 0;
+        }
+    }
+}
+
+void addBigram(bigramArray *countBigrams, int c0, int c1) {
+    pthread_mutex_lock(&countBigrams->arrayLock);
+    countBigrams->countBigrams[c0 - 'a'][c1 - 'a']++;
+    pthread_mutex_unlock(&countBigrams->arrayLock);
+}
+
+void printResults(bigramArray countBigram) {
+    int c0, c1;
+    for (c0 = 'a'; c0 <= 'z'; c0++) {
+        for (c1 = 'a'; c1 <= 'z'; c1++) {
+            int n = countBigram.countBigrams[c0 - 'a'][c1 - 'a'];
+            if (n) {
+                printf("%c%c: %d\n", c0, c1, n);
+            }
+        }
+    }
+}
+
+void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram) {
     ctx->pathQueue = pathQueue;
     ctx->fileQueue = fileQueue;
+    ctx->countBigram = countBigram;
 }
 
 void Path_Queue_Init(queue_p *q) {
