@@ -76,6 +76,10 @@ void initBigramArray(bigramArray *countBigram);
 
 void printResults(bigramArray countBigram, trigramArray countTrigram);
 
+void initTrigramArray(trigramArray *countTrigram);
+
+void addTrigram(trigramArray *countTrigram, int t0, int t1, int t2);
+
 
 int main() {
     int64_t start = currentTimeMillis();
@@ -105,16 +109,16 @@ int main() {
             i++;
         }
     }
-    int nThread = 100;
-    pthread_t thread[nThread];
-    for (int n = 0; n < nThread / 2; n++) {
+    int nProd = 2;
+    int nCons = 2;
+    pthread_t thread[nProd + nCons];
+    for (int n = 0; n < nProd; n++) {
         pthread_create(&thread[n], NULL, (void *) producer, &ctx);
-
     }
-    for (int n = nThread / 2; n < nThread; n++) {
+    for (int n = 0; n < nCons; n++) {
         pthread_create(&thread[n], NULL, (void *) consumer, &ctx);
     }
-    for (int n = 0; n < nThread; n++) {
+    for (int n = 0; n < nProd + nCons; n++) {
         pthread_join(thread[n], NULL);
 
     }
