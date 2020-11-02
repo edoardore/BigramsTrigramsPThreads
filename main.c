@@ -6,6 +6,8 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stdatomic.h>
+
 
 typedef struct __node_file {
     FILE *file;
@@ -45,6 +47,8 @@ typedef struct __context {
     queue_p *pathQueue;
     bigramArray *countBigram;
     trigramArray *countTrigram;
+    atomic_int nProducer;
+    atomic_int nQueue;
 
 } context;
 
@@ -70,7 +74,8 @@ void *consumer(context *ctx);
 int64_t currentTimeMillis();
 
 void
-setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram, trigramArray *countTrigram);
+setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram, trigramArray *countTrigram,
+           atomic_int *nProducer, atomic_int *nQueue);
 
 void initBigramArray(bigramArray *countBigram);
 
@@ -82,6 +87,10 @@ void addTrigram(trigramArray *countTrigram, int t0, int t1, int t2);
 
 
 int main() {
+    int nProd = 3;
+    int nCons = 3;
+    atomic_int nProducer = nProd;
+    atomic_int nQueue = 0;
     int64_t start = currentTimeMillis();
     queue_p pathQueue;
     Path_Queue_Init(&pathQueue);
@@ -92,7 +101,7 @@ int main() {
     trigramArray countTrigram;
     initTrigramArray(&countTrigram);
     context ctx;
-    setContext(&pathQueue, &fileQueue, &ctx, &countBigram, &countTrigram);
+    setContext(&pathQueue, &fileQueue, &ctx, &countBigram, &countTrigram, &nProducer, &nQueue);
     struct dirent *en;
     DIR *dr;
     char dir[] = "/Users/edore/CLionProjects/BigramsTrigramsParallel/Gutenberg/txt";
@@ -109,8 +118,6 @@ int main() {
             i++;
         }
     }
-    int nProd = 2;
-    int nCons = 2;
     pthread_t thread[nProd + nCons];
     for (int n = 0; n < nProd; n++) {
         pthread_create(&thread[n], NULL, (void *) producer, &ctx);
@@ -120,7 +127,6 @@ int main() {
     }
     for (int n = 0; n < nProd + nCons; n++) {
         pthread_join(thread[n], NULL);
-
     }
     int64_t time = currentTimeMillis() - start;
     printResults(countBigram, countTrigram);
@@ -143,26 +149,33 @@ void *producer(context *ctx) {
         FILE *file = fopen(path, "r");
         if (file != NULL) {
             File_Queue_Enqueue(ctx->fileQueue, file);
+            ++ctx->nQueue;
         }
     }
+    --ctx->nProducer;
 }
 
 void *consumer(context *ctx) {
     FILE *file;
-    while (File_Queue_Dequeue(ctx->fileQueue, &file) != -1) {
-        int c0 = EOF, c1;
-        int t0 = EOF, t1, t2;
-        while ((c1 = getc(file)) != EOF) {
-            t2 = c1;
-            if (c1 >= 'a' && c1 <= 'z' && c0 >= 'a' && c0 <= 'z') {
-                addBigram(ctx->countBigram, c0, c1);
+    while (1) {
+        if (ctx->nProducer == 0 && ctx->nQueue == 0)
+            break;
+        if (File_Queue_Dequeue(ctx->fileQueue, &file) == 0) {
+            --ctx->nQueue;
+            int c0 = EOF, c1;
+            int t0 = EOF, t1, t2;
+            while ((c1 = getc(file)) != EOF) {
+                t2 = c1;
+                if (c1 >= 'a' && c1 <= 'z' && c0 >= 'a' && c0 <= 'z') {
+                    addBigram(ctx->countBigram, c0, c1);
+                }
+                c0 = c1;
+                if (t2 >= 'a' && t2 <= 'z' && t1 >= 'a' && t1 <= 'z' && t0 >= 'a' && t0 <= 'z') {
+                    addTrigram(ctx->countTrigram, t0, t1, t2);
+                }
+                t0 = t1;
+                t1 = t2;
             }
-            c0 = c1;
-            if (t2 >= 'a' && t2 <= 'z' && t1 >= 'a' && t1 <= 'z' && t0 >= 'a' && t0 <= 'z') {
-                addTrigram(ctx->countTrigram, t0, t1, t2);
-            }
-            t0 = t1;
-            t1 = t2;
         }
     }
 }
@@ -191,15 +204,15 @@ void initTrigramArray(trigramArray *countTrigram) {
 }
 
 void addBigram(bigramArray *countBigram, int c0, int c1) {
-    pthread_mutex_lock(&countBigram->arrayLock);
+    //pthread_mutex_lock(&countBigram->arrayLock);
     countBigram->countBigram[c0 - 'a'][c1 - 'a']++;
-    pthread_mutex_unlock(&countBigram->arrayLock);
+    //pthread_mutex_unlock(&countBigram->arrayLock);
 }
 
 void addTrigram(trigramArray *countTrigram, int t0, int t1, int t2) {
-    pthread_mutex_lock(&countTrigram->arrayLock);
+    //pthread_mutex_lock(&countTrigram->arrayLock);
     countTrigram->countTrigram[t0 - 'a'][t1 - 'a'][t2 - 'a']++;
-    pthread_mutex_unlock(&countTrigram->arrayLock);
+    //pthread_mutex_unlock(&countTrigram->arrayLock);
 }
 
 
@@ -228,11 +241,15 @@ void printResults(bigramArray countBigram, trigramArray countTrigram) {
 }
 
 void
-setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram, trigramArray *countTrigram) {
+setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram,
+           trigramArray *countTrigram,
+           atomic_int *nProducer, atomic_int *nQueue) {
     ctx->pathQueue = pathQueue;
     ctx->fileQueue = fileQueue;
     ctx->countBigram = countBigram;
     ctx->countTrigram = countTrigram;
+    ctx->nProducer = *nProducer;
+    ctx->nQueue = *nQueue;
 }
 
 void Path_Queue_Init(queue_p *q) {
