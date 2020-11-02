@@ -204,15 +204,15 @@ void initTrigramArray(trigramArray *countTrigram) {
 }
 
 void addBigram(bigramArray *countBigram, int c0, int c1) {
-    //pthread_mutex_lock(&countBigram->arrayLock);
+    pthread_mutex_lock(&countBigram->arrayLock);
     countBigram->countBigram[c0 - 'a'][c1 - 'a']++;
-    //pthread_mutex_unlock(&countBigram->arrayLock);
+    pthread_mutex_unlock(&countBigram->arrayLock);
 }
 
 void addTrigram(trigramArray *countTrigram, int t0, int t1, int t2) {
-    //pthread_mutex_lock(&countTrigram->arrayLock);
+    pthread_mutex_lock(&countTrigram->arrayLock);
     countTrigram->countTrigram[t0 - 'a'][t1 - 'a'][t2 - 'a']++;
-    //pthread_mutex_unlock(&countTrigram->arrayLock);
+    pthread_mutex_unlock(&countTrigram->arrayLock);
 }
 
 
