@@ -73,9 +73,8 @@ void *consumer(context *ctx);
 
 int64_t currentTimeMillis();
 
-void
-setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram, trigramArray *countTrigram,
-           atomic_int *nProducer, atomic_int *nQueue);
+void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram,
+                trigramArray *countTrigram, atomic_int *nProducer, atomic_int *nQueue);
 
 void initBigramArray(bigramArray *countBigram);
 
@@ -88,7 +87,7 @@ void addTrigram(trigramArray *countTrigram, int t0, int t1, int t2);
 
 int main() {
     int nProd = 3;
-    int nCons = 3;
+    int nCons = 2;
     atomic_int nProducer = nProd;
     atomic_int nQueue = 0;
     int64_t start = currentTimeMillis();
@@ -240,10 +239,9 @@ void printResults(bigramArray countBigram, trigramArray countTrigram) {
     }
 }
 
-void
-setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram,
-           trigramArray *countTrigram,
-           atomic_int *nProducer, atomic_int *nQueue) {
+void setContext(queue_p *pathQueue, queue_f *fileQueue, context *ctx, bigramArray *countBigram,
+                trigramArray *countTrigram,
+                atomic_int *nProducer, atomic_int *nQueue) {
     ctx->pathQueue = pathQueue;
     ctx->fileQueue = fileQueue;
     ctx->countBigram = countBigram;
