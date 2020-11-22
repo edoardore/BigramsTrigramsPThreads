@@ -7,6 +7,11 @@ Eseguire il file main.c per il programma in parallelo, mentre per la versione se
 
 ## Esecuzione
 Il programma leggerà i file all'interno della directory Gutenberg\txt e ne calcolerà i bigrammi ed i trigrammi.
+È possibile impostare il numero di Thread Produttori e Consumatori nel file main.c
+```c
+int nProd = 4;
+int nCons = 2;
+```
 
 
 ## Esempio di output del file ```main.c```
